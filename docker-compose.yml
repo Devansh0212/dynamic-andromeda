@@ -1,0 +1,62 @@
+version: '3.4'
+
+services:
+  weaviate:
+    command:
+      - --host
+      - 0.0.0.0
+      - --port
+      - '8080'
+      - --scheme
+      - http
+    image: semitechnologies/weaviate:1.24.1
+    ports:
+      - 8080:8080
+    volumes:
+      - weaviate_data:/var/lib/weaviate
+    environment:
+      QUERY_DEFAULTS_LIMIT: 25
+      AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: 'true'
+      PERSISTENCE_DATA_PATH: '/var/lib/weaviate'
+      DEFAULT_VECTORIZER_MODULE: 'text2vec-transformers'
+      ENABLE_MODULES: 'text2vec-transformers'
+      TRANSFORMERS_INFERENCE_API: 'http://t2v-transformers:8080'
+      CLUSTER_HOSTNAME: 'node1'
+
+  t2v-transformers:
+    image: semitechnologies/transformers-inference:sentence-transformers-multi-qa-MiniLM-L6-cos-v1
+    environment:
+      ENABLE_CUDA: '0'
+    ports:
+      - 9090:8080
+
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: dalio
+      POSTGRES_PASSWORD: principles
+      POSTGRES_DB: economic_machine
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - 5432:5432
+
+  app:
+    build: .
+    volumes:
+      - .:/app
+    environment:
+      - FRED_API_KEY=${FRED_API_KEY}
+      - WEAVIATE_URL=http://weaviate:8080
+      - DATABASE_URL=postgresql://dalio:principles@db:5432/economic_machine
+      - OLLAMA_BASE_URL=http://host.docker.internal:11434
+    depends_on:
+      - weaviate
+      - db
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    command: tail -f /dev/null # Keep alive for dev
+
+volumes:
+  weaviate_data:
+  postgres_data:
